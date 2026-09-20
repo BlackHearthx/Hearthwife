@@ -1,5 +1,9 @@
 # Changelog
 
+## 1.0.1
+
+- Fix Thunderstore README images (use GitHub raw URLs — relative paths break on the site)
+
 ## 1.0.0
 
 - First Thunderstore release

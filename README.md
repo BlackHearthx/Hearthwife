@@ -4,8 +4,6 @@
 
 By **blackhearthx**. Single-player focused. Follows your game language (EN, PT-BR, DE, FR, ES, and more).
 
-![Hearthwife](icon.png)
-
 > Place one idol → she lives in the circle → cook, gather, repair, keep the fire, rest.
 
 ---
@@ -17,7 +15,7 @@ By **blackhearthx**. Single-player focused. Follows your game language (EN, PT-B
 Hammer → **Furniture** → **Wife Idol**.  
 Only **one** idol per world is allowed.
 
-![1. Place the idol](docs/tutorial/tutorial_01_place_idol.png)
+![1. Place the idol](https://raw.githubusercontent.com/BlackHearthx/Hearthwife/main/docs/tutorial/tutorial_01_place_idol.png)
 
 She appears near the idol. The blue circle is her home area.
 
@@ -29,7 +27,7 @@ She appears near the idol. The blue circle is her home area.
 | **Shift+E** | Open the menu |
 | **Crouch+E** | Call her back / unstuck (bring to the idol) |
 
-![2. Controls](docs/tutorial/tutorial_02_controls.png)
+![2. Controls](https://raw.githubusercontent.com/BlackHearthx/Hearthwife/main/docs/tutorial/tutorial_02_controls.png)
 
 Looking at **her** (not the idol): **E** talks when she is free.
 
@@ -41,7 +39,7 @@ Looking at **her** (not the idol): **E** talks when she is free.
 | **Balanced** | Works with pauses between tasks. |
 | **Hardworking** | Prioritizes chores; idle only when nothing to do. |
 
-![3. Lifestyle modes](docs/tutorial/tutorial_03_lifestyle.png)
+![3. Lifestyle modes](https://raw.githubusercontent.com/BlackHearthx/Hearthwife/main/docs/tutorial/tutorial_03_lifestyle.png)
 
 Also on **Home**: set her **name** and **bed** (look at a bed and press E when prompted).
 
@@ -54,7 +52,7 @@ Turn on what you want inside the idol circle:
 - Prepare meals (uses food from her idol chest)
 - Gather bushes and floor items (pick categories: berries, mushrooms, herbs…)
 
-![4. Chores at home](docs/tutorial/tutorial_04_chores.png)
+![4. Chores at home](https://raw.githubusercontent.com/BlackHearthx/Hearthwife/main/docs/tutorial/tutorial_04_chores.png)
 
 ### 5. Life / presence (menu → Life)
 
@@ -83,7 +81,7 @@ Martelo → **Mobília** → **Ídolo da esposa** (só um por mundo).
 | **Shift+E** | Abrir o menu |
 | **Agachar+E** | Chamar / destravar (traz ao ídolo) |
 
-![2. Controles no ídolo](docs/tutorial/tutorial_02_controls_pt.png)
+![2. Controles no ídolo](https://raw.githubusercontent.com/BlackHearthx/Hearthwife/main/docs/tutorial/tutorial_02_controls_pt.png)
 
 Olhando **ela**: **E** conversa quando estiver livre.
 
