@@ -1,0 +1,88 @@
+---
+description: Hearthwife coding standards — refs first, no guessing, no collateral damage
+alwaysApply: true
+---
+
+# Hearthwife — coding rules (always)
+
+## Before writing code
+
+1. **Never invent APIs or game behavior.** Research first — **not limited to `_ref/` alone**:
+   - Project `_ref/` (Fires, VillageNPCs, IdleActors, OfflineCompanions, etc.)
+   - Valheim / Jotunn real APIs (docs, decompiled, or assemblies in use)
+   - `_ref/REFERENCE_MEMORY.md` when planning features
+   - **External sources when better suited:** Unity NPC/companion patterns, pathfinding (NavMesh/A*, agent avoidance), look-at/IK, idle FSM, Valheim Nexus/GitHub mods, engine docs. Prefer adapting proven behavior over inventing from scratch.
+2. When using external ideas: map them onto **real Valheim/Jotunn APIs** we already use (e.g. `MonsterAI.MoveTo`, `LookAt`, Character) — do not paste incompatible Unity stacks blindly.
+3. **Prefer a short plan after research** when the change is non-trivial: what was checked (refs + web if used) → what will change → what must not break.
+4. **Do not assume** (“provavelmente funciona”). If unsure, look it up or verify with a build.
+
+## Quality bar
+
+- Code should be **correct and complete enough** that Sergio does not need a refine loop for the same bug.
+- Prefer **small, isolated diffs** that solve the reported issue.
+- Match existing project patterns; no drive-by refactors or unrelated edits.
+
+## Bug / regression mindset (every change)
+
+Ask before shipping:
+
+- What already works nearby (walk, sit, sleep, emotes, water, player clearance, menu tabs)?
+- Can this cancel, race, or double-drive that path (e.g. BasicsOnly stuck cancel, Stop+Play same frame)?
+- Does a call site need duration/config/menu flag consistency?
+- Build must succeed before claiming done; deploy only the intended DLL.
+
+## Symptom audits (do not mark OK from a checklist skim)
+
+When Sergio reports a bug **or** asks to “checar bugs / revisar tudo”, do **not** stamp areas OK from file existence or high-level greps.
+
+1. **Restate the exact player scenario** (state × position × action), e.g. “idle + behind”, “walking stroll + behind”, “E while pathing to fire”.
+2. **Trace the live code path** for that scenario (which `Update` branch, which early-return, which yield/face/look write). Quote the deciding `if`.
+3. **Sibling matrix** — same symptom class, other states. Example for tremble / shake / jitter:
+   - States: idle parked · idle stroll (`_hasTarget`) · chore walk · sit · sitfire · sleep · emote · E-attend
+   - Positions: front · side · behind · very close (`<1.2`) · clearance band
+   - Drivers that fight: `FacePlayerBody`, `ShouldYieldToPlayer`, head LateUpdate, `LookAt` IK, `ParkStill`/`FaceHome`, attach pin, emote Stop+Play
+4. **Fix claim rule:** only say “resolvido” for scenarios actually traced. If only idle was fixed, say idle — do not imply walking.
+5. **After a tremble/look/yield fix:** re-read `ShouldYieldToPlayer`, `TickLookAtPlayer` / `FacePlayerBody`, and the walk `Update` branch before shipping.
+
+### Anti-patterns that already failed us
+
+- Checklist audit saying “player clearance OK” without simulating behind + `d < 1.2` while walking.
+- Fixing ambient face-behind idle and answering as if walking was covered.
+- Trusting explore-subagent “OK” without opening the exact conditional.
+- `MonsterAI.enabled = false` to stop stutter — **broke all walking** (`Character.UpdateWalking` / MoveTo); skip brain via Harmony `MonsterAI.UpdateAI` prefix instead.
+- Permanent `Physics.IgnoreCollision` with the player — **clips through her**; use path yield only.
+- Treating `BaseAI.MoveTo` returning true as “arrived” — **FindPath failure also returns true** and cancelled every stroll.
+- `Rigidbody.isKinematic = true` on Boot — Character walks via `AddForce`; kinematic = **turn in place only** (LookTowards). Keep non-kinematic like Player/Fires.
+- `m_moveMinAngle` left at default 10° with `m_smoothMovement` — spin forever; VillageNPCs uses **90**.
+- **Stationary work Y-axis jitter:** `FacePoint` every wait tick + `FacePlayerBody` / head LookAt + `RandomAnimation` while `_hasTarget == false`. Use `EnterStationaryWorkHold` (face **once**) + `HoldStationaryWorkTick` (ParkStill only). Never re-snap yaw in a wait loop. `RefreshRandomAnimationGate` must stay off for `_chore != Idle`. `FacePoint` must also `SetLookDir` so Character does not fight transform.rotation.
+- **Night sleep mid-chore:** `TickAtmosphere` must not `BeginSleep` while `IsBusyOwned()` on work chores (cook wait / repair / fire). Finish work first; only then walk to bed. `BeginSleep` still `StopWorkRoutine` as safety net.
+
+## Chore ownership flow (do not reinvent)
+
+Already in place — extend, don't replace:
+
+1. **One owner:** `BeginOwnedChore` → `_chore != Idle` → `IsBusyOwned` / `IsBeatLocked` block new picks.
+2. **Priority in `TickWork`:** cook-collect → fire → collect → repair → smelt → cook-place → … → idle.
+3. **Cooldown** after `EndOwnedChore`; only cook-collect may break cooldown (burn window).
+4. **Lifestyle:** Leisure = presence only; Balanced/Diligent = work list above.
+5. New chore: add `TryBegin*` in the priority list + `IsStationaryWorkHold` + `EnterStationaryWorkHold` on arrive.
+
+## Stationary work hold (mandatory for any chore that stops to act)
+
+When she arrives at a prop and stops pathing (cook wait, fire, repair, fish, smelt, farm, forage, mead, cauldron, collect pickup, garden tip):
+
+1. Call `EnterStationaryWorkHold(faceWorld, seconds)` — or `EnterStationaryWorkHold(seconds)` if yaw already set (e.g. water).
+2. Long waits / loops: only `HoldStationaryWorkTick()` — **no** `FacePoint` each iteration.
+3. Ensure `IsStationaryWorkHold()` includes the new chore enum so `Update` ParkStills and `TickLookAtPlayer` skips body/head fight.
+4. Do not leave `_hasTarget = false` with RandomAnimation enabled during work.
+
+## Scope discipline
+
+- Totem mesh / prior fixed systems: leave alone unless the task requires them.
+- No commits unless Sergio asks.
+- No speculative features outside the request — **except** theme-fit defaults (see `hearthwife-theme-fit.mdc`): when implementing a requested feature, choose aesthetics/names that fit **wife/homestead**, and **suggest** better UX before shipping if the obvious Valheim/ref default is combat/generic.
+
+## Product sense (with theme rule)
+
+- Prefer a short suggestion (“melhor seria X porque…”) before coding non-bug UX.
+- Never ship warrior/mercenary framing for wife-facing UI without calling it out.

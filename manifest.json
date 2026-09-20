@@ -1,0 +1,10 @@
+{
+  "name": "Hearthwife",
+  "version_number": "1.0.0",
+  "website_url": "",
+  "description": "Homestead wife for your Valheim home: idol, chores, presence, and comfort. Follows your game language.",
+  "dependencies": [
+    "denikson-BepInExPack_Valheim-5.4.2200",
+    "ValheimModding-Jotunn-2.29.2"
+  ]
+}

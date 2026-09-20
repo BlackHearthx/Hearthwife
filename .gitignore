@@ -1,0 +1,31 @@
+## Build
+[Bb]in/
+[Oo]bj/
+[Dd]ebug/
+[Rr]elease/
+.vs/
+.idea/
+*.user
+*.suo
+*.userosscache
+
+## NuGet
+*.nupkg
+**/packages/*
+
+## Reference dumps / decompiles (local only)
+_ref/
+_ref_*/
+**/_ref/
+
+## Pack output (rebuild with pack.ps1)
+dist/
+
+## OS / editor
+Thumbs.db
+Desktop.ini
+.DS_Store
+*.tmp
+*.log
+
+## Keep Environment.props (local Valheim/deploy paths; no secrets)

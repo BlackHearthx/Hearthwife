@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <VALHEIM_INSTALL>C:\Program Files (x86)\Steam\steamapps\common\Valheim</VALHEIM_INSTALL>
+    <BEPINEX_PATH>$(VALHEIM_INSTALL)\BepInEx</BEPINEX_PATH>
+    <MOD_DEPLOYPATH>C:\Users\Sergi\AppData\Roaming\Thunderstore Mod Manager\DataFolder\Valheim\profiles\Mod tests\BepInEx\plugins\blackhearthx-Hearthwife</MOD_DEPLOYPATH>
+  </PropertyGroup>
+</Project>

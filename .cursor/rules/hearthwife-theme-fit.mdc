@@ -1,0 +1,46 @@
+---
+description: Hearthwife theme fit — suggest before shipping UX/defaults; wife not combat companion
+alwaysApply: true
+---
+
+# Hearthwife — tema, sugestões e senso de produto
+
+## O que este mod é
+
+Hearthwife = **esposa de lar / homestead** (presença, carinho, rotina, conforto, vida ociosa e chores de casa).  
+**Não** é companion de combate, mercenário, follower de raid ou “viking guerreiro genérico”.
+
+Offline Companions / VillageNPCs são **referência de API e mecânica** — não de estética nem de tom. Copiar o padrão técnico (ex. `Minimap.AddPin`) **não** autoriza copiar o ícone/voz/UI de guerreiro.
+
+## Antes de aplicar (obrigatório em UX / defaults / visuals)
+
+Para qualquer coisa que o **jogador vê ou sente** (ícone de mapa, nome de modo, cor, emote, toggle de menu, buff, som, hover text):
+
+1. **Perguntar mentalmente:** “Isso parece esposa no lar, ou parece companion de guerra / pet / NPC genérico?”
+2. Se o default óbvio do jogo/ref for genérico (ex. `PinType.Player` = guerreiro), **não shipar assim**. Escolher alternativa alinhada (coração, ícone suave, Hildir-like, custom) **ou** sugerir 1–2 opções ao Sergio **antes** de codar.
+3. Em mudanças não triviais de design (modos de vida, rotina, mapa, conforto, nomes na UI): **sugerir o melhor cenário em 2–4 linhas** → só então implementar se ele confirmar **ou** se for correção óbvia de bug.
+
+## Quando discordar ou corrigir Sergio
+
+Se o pedido for tecnicamente frágil, quebrar path/anim, ou for fora do tema:
+
+- Dizer **por quê** (1 frase + evidência de ref/API se houver).
+- Propor alternativa alinhada ao lar **antes** de codar o pedido “errado”.
+
+Não ser passivo: “você pediu X, mas Y encaixa melhor no Hearthwife porque…”
+
+## Exemplos (já aconteceram / evitar)
+
+| Pedido | Errado (não repetir) | Certo |
+|--------|----------------------|--------|
+| Pin no mapa em tempo real | `PinType.Player` (guerreiro) | Coração / ícone feminino / suave + nome dela |
+| Modo ocioso | Nome “trophy wife” / esposa troféu na UI | “Vida no lar” / Leisure |
+| Parar tremor | `MonsterAI.enabled = false` | Harmony skip UpdateAI; RB non-kinematic |
+| Colisão | `IgnoreCollision` permanente | Yield no path + corpos sólidos |
+
+## Checklist rápido antes do deploy
+
+- [ ] Visual/copy combina com **esposa / lar**?
+- [ ] Sugeri opção melhor se o default do Valheim/ref era genérico/combat?
+- [ ] Path, LookAt, sit/sleep attach e beats não foram colaterais?
+- [ ] Nomes PT/EN neutros e carinhosos (sem pejorativo)?

@@ -1,0 +1,57 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="Environment.props" Condition="Exists('Environment.props')" />
+
+  <PropertyGroup>
+    <TargetFramework>net462</TargetFramework>
+    <OutputType>Library</OutputType>
+    <AssemblyName>Hearthwife</AssemblyName>
+    <RootNamespace>Hearthwife</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Nullable>disable</Nullable>
+    <GenerateAssemblyInfo>true</GenerateAssemblyInfo>
+    <GenerateTargetFrameworkAttribute>false</GenerateTargetFrameworkAttribute>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
+    <DebugType>portable</DebugType>
+    <Version>1.0.0</Version>
+    <Authors>blackhearthx</Authors>
+    <Description>Homestead wife for Valheim: fire, gather, cook, repair, rest and presence from an idol.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="JotunnLib" Version="2.29.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="_ref\**" />
+    <None Remove="_ref\**" />
+    <EmbeddedResource Remove="_ref\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Assets\Hearthwife_Idol.obj" Condition="Exists('Assets\Hearthwife_Idol.obj')" />
+    <EmbeddedResource Include="Assets\hearthwife_totem_ref.rgba" Condition="Exists('Assets\hearthwife_totem_ref.rgba')" />
+    <EmbeddedResource Include="Assets\hearthwife_idol_icon.rgba" Condition="Exists('Assets\hearthwife_idol_icon.rgba')" />
+    <EmbeddedResource Include="Assets\hearthwife_map_heart.rgba" Condition="Exists('Assets\hearthwife_map_heart.rgba')" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="Translations\**\*.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="DeployToValheim" AfterTargets="Build">
+    <MakeDir Directories="$(MOD_DEPLOYPATH)" Condition="'$(MOD_DEPLOYPATH)' != ''" />
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(MOD_DEPLOYPATH)" Condition="'$(MOD_DEPLOYPATH)' != '' And Exists('$(TargetPath)')" />
+    <ItemGroup Condition="'$(MOD_DEPLOYPATH)' != ''">
+      <_HwLocFiles Include="$(OutputPath)Translations\**\*.json" />
+    </ItemGroup>
+    <Copy
+      SourceFiles="@(_HwLocFiles)"
+      DestinationFiles="@(_HwLocFiles->'$(MOD_DEPLOYPATH)\Translations\%(RecursiveDir)%(Filename)%(Extension)')"
+      Condition="'$(MOD_DEPLOYPATH)' != '' And '@(_HwLocFiles)' != ''"
+      SkipUnchangedFiles="true" />
+  </Target>
+</Project>
