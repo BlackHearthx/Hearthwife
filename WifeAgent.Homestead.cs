@@ -1324,6 +1324,7 @@ namespace Hearthwife
 
         /// <summary>
         /// Wood/iron cooking rack (grelha / bancada). Needs lit fire under it when m_requireFire.
+        /// Checks the station root, each slot, and a point below (tall racks sit above the flame).
         /// </summary>
         private static bool IsCookingStationUsable(CookingStation station)
         {
@@ -1334,21 +1335,64 @@ namespace Hearthwife
 
             try
             {
-                if (station.m_requireFire &&
-                    !EffectArea.IsPointPlus025InsideBurningArea(station.transform.position))
+                if (!station.m_requireFire)
                 {
-                    return false;
+                    return true;
+                }
+
+                // Prefer vanilla private IsFireLit when present (publicized builds).
+                try
+                {
+                    var lit = station.IsFireLit();
+                    return lit;
+                }
+                catch
+                {
+                }
+
+                if (EffectArea.IsPointPlus025InsideBurningArea(station.transform.position))
+                {
+                    return true;
+                }
+
+                if (station.m_slots != null)
+                {
+                    foreach (var slot in station.m_slots)
+                    {
+                        if (slot == null)
+                        {
+                            continue;
+                        }
+
+                        if (EffectArea.IsPointPlus025InsideBurningArea(slot.position))
+                        {
+                            return true;
+                        }
+
+                        // Flame is under the rack — sample a bit below each hook.
+                        if (EffectArea.IsPointPlus025InsideBurningArea(slot.position + Vector3.down * 0.85f))
+                        {
+                            return true;
+                        }
+                    }
+                }
+
+                if (EffectArea.IsPointPlus025InsideBurningArea(station.transform.position + Vector3.down * 1.1f))
+                {
+                    return true;
                 }
             }
             catch
             {
             }
 
-            return true;
+            return false;
         }
 
         /// <summary>
-        /// Player path: UseItem → CookItem → RPC_AddItem. Never lose raw food on failure.
+        /// Place one raw food on the grill. Never lose the item on failure.
+        /// Uses UseItem when possible; otherwise claims ownership + RPC_AddItem(string) — the bool
+        /// overload used before was wrong and made placement always fail for NPCs.
         /// </summary>
         private bool TryPlaceFoodOnStation(
             CookingStation station,
@@ -1365,13 +1409,12 @@ namespace Hearthwife
                 return false;
             }
 
-            var prefab = fromChest.m_dropPrefab;
-            if (prefab == null)
+            var prefabName = ResolveItemPrefabName(fromChest);
+            if (string.IsNullOrEmpty(prefabName))
             {
                 return false;
             }
 
-            var prefabName = prefab.name;
             try
             {
                 if (!station.IsItemAllowed(fromChest) && !station.IsItemAllowed(prefabName))
@@ -1383,8 +1426,25 @@ namespace Hearthwife
                 {
                     return false;
                 }
+
+                // Publicized: GetFreeSlot returns -1 when full.
+                try
+                {
+                    if (station.GetFreeSlot() < 0)
+                    {
+                        return false;
+                    }
+                }
+                catch
+                {
+                }
             }
             catch
+            {
+                return false;
+            }
+
+            if (!IsCookingStationUsable(station))
             {
                 return false;
             }
@@ -1395,33 +1455,39 @@ namespace Hearthwife
                 return false;
             }
 
+            // Snapshot before we move stacks around.
+            var slotsBefore = CountFilledCookSlots(station);
+
             chest.RemoveItem(fromChest, 1);
             var piece = fromChest.Clone();
             piece.m_stack = 1;
+            if (piece.m_dropPrefab == null && ObjectDB.instance != null)
+            {
+                piece.m_dropPrefab = ObjectDB.instance.GetItemPrefab(prefabName);
+            }
+
             if (!wifeInv.AddItem(piece))
             {
-                chest.AddItem(piece);
+                ReturnFoodToChest(chest, station, prefabName, fromChest);
                 return false;
             }
 
-            ItemDrop.ItemData held = null;
-            foreach (var it in wifeInv.GetAllItems())
-            {
-                if (it?.m_dropPrefab == null || it.m_stack < 1)
-                {
-                    continue;
-                }
-
-                if (it.m_dropPrefab.name == prefabName)
-                {
-                    held = it;
-                    break;
-                }
-            }
-
+            ItemDrop.ItemData held = FindInvItemByPrefab(wifeInv, prefabName);
             if (held == null)
             {
+                ReturnFoodToChest(chest, station, prefabName, fromChest);
                 return false;
+            }
+
+            try
+            {
+                if (!station.m_nview.HasOwner() || !station.m_nview.IsOwner())
+                {
+                    station.m_nview.ClaimOwnership();
+                }
+            }
+            catch
+            {
             }
 
             var ok = false;
@@ -1434,28 +1500,160 @@ namespace Hearthwife
                 ok = false;
             }
 
-            if (ok)
+            if (ok || CountFilledCookSlots(station) > slotsBefore)
             {
                 return true;
             }
 
-            // Fallback: correct RPC name is RPC_AddItem (old code called "AddItem" and lost the meat).
+            // Direct path used by vanilla CookItem: remove from inventory + RPC_AddItem(name only).
             try
             {
-                if (station.IsItemAllowed(prefabName))
+                if (!station.IsItemAllowed(prefabName))
                 {
-                    wifeInv.RemoveItem(held, 1);
-                    station.m_nview.InvokeRPC("RPC_AddItem", prefabName, false);
+                    // Still try ObjectDB-normalized name (Clone / shared-name mismatches).
+                    var alt = NormalizePrefabName(prefabName);
+                    if (alt != prefabName && station.IsItemAllowed(alt))
+                    {
+                        prefabName = alt;
+                    }
+                    else if (!station.IsItemAllowed(held) && !station.IsItemAllowed(fromChest))
+                    {
+                        ReturnHeldFood(wifeInv, held, chest, station, fromChest);
+                        return false;
+                    }
+                }
+
+                held = FindInvItemByPrefab(wifeInv, prefabName) ?? held;
+                if (held == null || held.m_stack < 1)
+                {
+                    ReturnFoodToChest(chest, station, prefabName, fromChest);
+                    return false;
+                }
+
+                wifeInv.RemoveItem(held, 1);
+                station.m_nview.InvokeRPC("RPC_AddItem", prefabName);
+
+                if (CountFilledCookSlots(station) > slotsBefore || StationHasAnyFood(station))
+                {
                     return true;
                 }
+
+                // RPC may be owner-side async — if still empty, put food back.
+                ReturnFoodToChest(chest, station, prefabName, fromChest);
+                return false;
+            }
+            catch
+            {
+                ReturnHeldFood(wifeInv, held, chest, station, fromChest);
+                return false;
+            }
+        }
+
+        private static int CountFilledCookSlots(CookingStation station)
+        {
+            if (station?.m_nview == null || !station.m_nview.IsValid())
+            {
+                return 0;
+            }
+
+            var zdo = station.m_nview.GetZDO();
+            var n = station.m_slots != null ? station.m_slots.Length : 0;
+            var filled = 0;
+            for (var i = 0; i < n; i++)
+            {
+                if (!string.IsNullOrEmpty(zdo.GetString("slot" + i, "")))
+                {
+                    filled++;
+                }
+            }
+
+            return filled;
+        }
+
+        private static string ResolveItemPrefabName(ItemDrop.ItemData item)
+        {
+            if (item == null)
+            {
+                return null;
+            }
+
+            if (item.m_dropPrefab != null)
+            {
+                return NormalizePrefabName(item.m_dropPrefab.name);
+            }
+
+            // Shared token → ObjectDB prefab (chest stacks sometimes lack m_dropPrefab).
+            try
+            {
+                var shared = item.m_shared?.m_name;
+                if (!string.IsNullOrEmpty(shared) && ObjectDB.instance != null)
+                {
+                    var go = ObjectDB.instance.GetItemPrefab(shared);
+                    if (go != null)
+                    {
+                        return NormalizePrefabName(go.name);
+                    }
+                }
             }
             catch
             {
             }
 
+            return null;
+        }
+
+        private static string NormalizePrefabName(string name)
+        {
+            if (string.IsNullOrEmpty(name))
+            {
+                return name;
+            }
+
+            var n = name;
+            const string clone = "(Clone)";
+            if (n.EndsWith(clone, System.StringComparison.Ordinal))
+            {
+                n = n.Substring(0, n.Length - clone.Length).TrimEnd();
+            }
+
+            return n;
+        }
+
+        private static ItemDrop.ItemData FindInvItemByPrefab(Inventory inv, string prefabName)
+        {
+            if (inv == null || string.IsNullOrEmpty(prefabName))
+            {
+                return null;
+            }
+
+            foreach (var it in inv.GetAllItems())
+            {
+                if (it == null || it.m_stack < 1)
+                {
+                    continue;
+                }
+
+                var n = ResolveItemPrefabName(it);
+                if (!string.IsNullOrEmpty(n) &&
+                    n.Equals(prefabName, System.StringComparison.OrdinalIgnoreCase))
+                {
+                    return it;
+                }
+            }
+
+            return null;
+        }
+
+        private static void ReturnHeldFood(
+            Inventory wifeInv,
+            ItemDrop.ItemData held,
+            Inventory chest,
+            CookingStation station,
+            ItemDrop.ItemData template)
+        {
             try
             {
-                if (held.m_stack > 0)
+                if (held != null && held.m_stack > 0 && wifeInv != null)
                 {
                     wifeInv.RemoveItem(held, 1);
                 }
@@ -1464,24 +1662,54 @@ namespace Hearthwife
             {
             }
 
-            var back = fromChest.Clone();
-            back.m_stack = 1;
-            if (!chest.AddItem(back))
-            {
-                try
-                {
-                    ItemDrop.DropItem(
-                        back,
-                        1,
-                        station.transform.position + Vector3.up * 0.3f,
-                        Quaternion.identity);
-                }
-                catch
-                {
-                }
-            }
+            ReturnFoodToChest(chest, station, ResolveItemPrefabName(template), template);
+        }
 
-            return false;
+        private static void ReturnFoodToChest(
+            Inventory chest,
+            CookingStation station,
+            string prefabName,
+            ItemDrop.ItemData template)
+        {
+            try
+            {
+                ItemDrop.ItemData back = null;
+                if (template != null)
+                {
+                    back = template.Clone();
+                    back.m_stack = 1;
+                }
+                else if (!string.IsNullOrEmpty(prefabName) && ObjectDB.instance != null)
+                {
+                    var go = ObjectDB.instance.GetItemPrefab(prefabName);
+                    var drop = go != null ? go.GetComponent<ItemDrop>() : null;
+                    if (drop?.m_itemData != null)
+                    {
+                        back = drop.m_itemData.Clone();
+                        back.m_stack = 1;
+                        back.m_dropPrefab = go;
+                    }
+                }
+
+                if (back == null)
+                {
+                    return;
+                }
+
+                if (chest != null && chest.AddItem(back))
+                {
+                    return;
+                }
+
+                ItemDrop.DropItem(
+                    back,
+                    1,
+                    (station != null ? station.transform.position : Vector3.zero) + Vector3.up * 0.3f,
+                    Quaternion.identity);
+            }
+            catch
+            {
+            }
         }
 
         private static void CollectDoneFood(CookingStation station, Inventory inv)
@@ -1842,12 +2070,19 @@ namespace Hearthwife
                     var fromName = conv.m_from.name;
                     foreach (var item in inv.GetAllItems())
                     {
-                        if (item?.m_dropPrefab == null || item.m_stack < 1)
+                        if (item == null || item.m_stack < 1)
                         {
                             continue;
                         }
 
-                        if (item.m_dropPrefab.name == fromName)
+                        var itemPrefab = ResolveItemPrefabName(item);
+                        if (!string.IsNullOrEmpty(itemPrefab) &&
+                            itemPrefab.Equals(fromName, System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            return item;
+                        }
+
+                        if (item.m_dropPrefab != null && item.m_dropPrefab.name == fromName)
                         {
                             return item;
                         }

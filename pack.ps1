@@ -1,5 +1,9 @@
 # Pack Thunderstore zip (Hearthwife)
+# Uses ZipArchive with forward-slash entry names so r2modman / Linux extractors keep Translations/ nested.
 $ErrorActionPreference = "Stop"
+Add-Type -AssemblyName System.IO.Compression
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+
 $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $dist = Join-Path $root "dist\thunderstore"
 $dll = Join-Path $root "bin\Release\Hearthwife.dll"
@@ -24,12 +28,59 @@ Copy-Item $dll (Join-Path $dist "Hearthwife.dll") -Force
 Copy-Item (Join-Path $root "docs\tutorial\*") (Join-Path $dist "docs\tutorial") -Force
 
 $locSrc = Join-Path $root "Translations"
-if (Test-Path $locSrc) {
-  Copy-Item $locSrc (Join-Path $dist "Translations") -Recurse -Force
+if (-not (Test-Path $locSrc)) {
+  throw "Translations folder missing at $locSrc - refuse to pack a broken localization package."
+}
+Copy-Item $locSrc (Join-Path $dist "Translations") -Recurse -Force
+
+$langDirs = @(Get-ChildItem (Join-Path $dist "Translations") -Directory -ErrorAction SilentlyContinue)
+$langCount = $langDirs.Count
+if ($langCount -lt 17) {
+  throw "Expected at least 17 language folders under Translations/, found $langCount"
+}
+foreach ($d in $langDirs) {
+  $jf = Join-Path $d.FullName "hearthwife.json"
+  if (-not (Test-Path $jf)) {
+    throw "Missing hearthwife.json in $($d.Name)"
+  }
 }
 
 New-Item -ItemType Directory -Force -Path (Join-Path $root "dist") | Out-Null
 if (Test-Path $zip) { Remove-Item $zip -Force }
-Compress-Archive -Path (Join-Path $dist "*") -DestinationPath $zip -Force
+
+# Zip with Unix-style paths (forward slashes). Compress-Archive uses backslashes and can break extractors.
+$zipArchive = [System.IO.Compression.ZipFile]::Open($zip, [System.IO.Compression.ZipArchiveMode]::Create)
+try {
+  Get-ChildItem $dist -Recurse -File | ForEach-Object {
+    $rel = $_.FullName.Substring($dist.Length).TrimStart([char]'\', [char]'/').Replace([char]'\', [char]'/')
+    [void][System.IO.Compression.ZipFileExtensions]::CreateEntryFromFile(
+      $zipArchive,
+      $_.FullName,
+      $rel,
+      [System.IO.Compression.CompressionLevel]::Optimal)
+  }
+}
+finally {
+  $zipArchive.Dispose()
+}
+
+# Verify zip contents
+$check = [System.IO.Compression.ZipFile]::OpenRead($zip)
+try {
+  $names = @($check.Entries | ForEach-Object { $_.FullName })
+  $tr = @($names | Where-Object { $_ -like 'Translations/*/hearthwife.json' })
+  if ($tr.Count -lt 17) {
+    $joined = $names -join "`n"
+    throw "Pack verify failed: zip has $($tr.Count) Translations/*/hearthwife.json entries (need 17+). Entries:`n$joined"
+  }
+  if ($names -contains 'hearthwife.json') {
+    throw "Pack verify failed: loose hearthwife.json at zip root (should live under Translations/{Lang}/)."
+  }
+  Write-Host "Verified $($tr.Count) translation files in zip (forward-slash paths)."
+}
+finally {
+  $check.Dispose()
+}
+
 Write-Host "Ready: $zip"
 Get-Item $zip | Format-List FullName, Length, LastWriteTime

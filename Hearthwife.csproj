@@ -14,7 +14,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <DebugType>portable</DebugType>
-    <Version>1.0.1</Version>
+    <Version>1.0.2</Version>
     <Authors>blackhearthx</Authors>
     <Description>Homestead wife for Valheim: fire, gather, cook, repair, rest and presence from an idol.</Description>
   </PropertyGroup>
@@ -37,9 +37,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Ship beside the DLL for Thunderstore / r2modman, and embed so missing folder never breaks UI text. -->
     <None Include="Translations\**\*.json">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </None>
+    <EmbeddedResource Include="Translations\**\*.json" />
   </ItemGroup>
 
   <Target Name="DeployToValheim" AfterTargets="Build">

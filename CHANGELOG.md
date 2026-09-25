@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- Fix idol placement: hammer preview/ghost no longer counts toward MaxIdols (was blocking place with `$hearthwife_idol_limit` on a fresh world)
+- Fix cooking: wife can place food on the rack again (`RPC_AddItem` used the wrong args; fire check also samples below tall racks)
+- Fix localization packaging: Thunderstore zip now verifies `Translations/{Language}/hearthwife.json` and uses forward-slash zip paths (r2modman-safe)
+- Embed all language JSON files in the DLL so button/menu text still loads if the Translations folder is missing after install
+
 ## 1.0.1
 
 - Fix Thunderstore README images (use GitHub raw URLs — relative paths break on the site)

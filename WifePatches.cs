@@ -70,7 +70,9 @@ namespace Hearthwife
                 return true;
             }
 
-            if (WifeLimits.CanPlaceAnotherIdol())
+            // Exclude the hammer ghost / piece being placed — it also has WifeHome.
+            var ghostHome = piece != null ? piece.GetComponent<WifeHome>() : null;
+            if (WifeLimits.CanPlaceAnotherIdol(ghostHome))
             {
                 return true;
             }

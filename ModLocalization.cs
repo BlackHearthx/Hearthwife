@@ -35,51 +35,105 @@ namespace Hearthwife
         {
             var loc = LocalizationManager.Instance.GetLocalization();
             var loaded = 0;
+            var fromDisk = 0;
+            var fromEmbed = 0;
 
             foreach (var lang in Languages)
             {
-                if (TryLoadLanguageJson(loc, lang))
+                var source = TryLoadLanguage(loc, lang);
+                if (source == LoadSource.None)
                 {
-                    loaded++;
+                    continue;
+                }
+
+                loaded++;
+                if (source == LoadSource.Disk)
+                {
+                    fromDisk++;
+                }
+                else if (source == LoadSource.Embedded)
+                {
+                    fromEmbed++;
                 }
             }
 
-            // Hard fallback if files missing next to the DLL (dev / odd deploy).
+            // Last-resort fallback if both disk and embedded resources failed.
             if (loaded == 0)
             {
                 RegisterInlineEnglish(loc);
-                Jotunn.Logger.LogWarning("Hearthwife: Translations folder missing — English inline fallback only");
+                Jotunn.Logger.LogWarning("Hearthwife: Translations missing on disk and in assembly — English inline fallback only");
             }
             else
             {
-                Jotunn.Logger.LogInfo($"Hearthwife: loaded localization for {loaded} language(s)");
+                Jotunn.Logger.LogInfo(
+                    $"Hearthwife: loaded localization for {loaded} language(s) (disk={fromDisk}, embedded={fromEmbed})");
             }
         }
 
-        private static bool TryLoadLanguageJson(Jotunn.Entities.CustomLocalization loc, string language)
+        private enum LoadSource
+        {
+            None,
+            Disk,
+            Embedded
+        }
+
+        private static LoadSource TryLoadLanguage(Jotunn.Entities.CustomLocalization loc, string language)
         {
             try
             {
                 var path = FindTranslationPath(language);
-                if (string.IsNullOrEmpty(path) || !File.Exists(path))
+                if (!string.IsNullOrEmpty(path) && File.Exists(path))
                 {
-                    return false;
+                    var json = File.ReadAllText(path);
+                    if (!string.IsNullOrEmpty(json))
+                    {
+                        loc.AddJsonFile(language, json);
+                        return LoadSource.Disk;
+                    }
                 }
 
-                var json = File.ReadAllText(path);
-                if (string.IsNullOrEmpty(json))
+                var embedded = ReadEmbeddedJson(language);
+                if (!string.IsNullOrEmpty(embedded))
                 {
-                    return false;
+                    loc.AddJsonFile(language, embedded);
+                    return LoadSource.Embedded;
                 }
 
-                loc.AddJsonFile(language, json);
-                return true;
+                return LoadSource.None;
             }
             catch (Exception ex)
             {
                 Jotunn.Logger.LogWarning($"Hearthwife: failed loading {language} loc — {ex.Message}");
-                return false;
+                return LoadSource.None;
             }
+        }
+
+        private static string ReadEmbeddedJson(string language)
+        {
+            var asm = Assembly.GetExecutingAssembly();
+            // SDK default: Hearthwife.Translations.English.hearthwife.json
+            var wantSuffix = $".Translations.{language}.hearthwife.json";
+            foreach (var name in asm.GetManifestResourceNames())
+            {
+                if (name.EndsWith(wantSuffix, StringComparison.OrdinalIgnoreCase)
+                    || string.Equals(name, $"Hearthwife.Translations.{language}.hearthwife.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    using (var stream = asm.GetManifestResourceStream(name))
+                    {
+                        if (stream == null)
+                        {
+                            continue;
+                        }
+
+                        using (var reader = new StreamReader(stream))
+                        {
+                            return reader.ReadToEnd();
+                        }
+                    }
+                }
+            }
+
+            return null;
         }
 
         private static string FindTranslationPath(string language)
@@ -92,10 +146,18 @@ namespace Hearthwife
                 var asm = Assembly.GetExecutingAssembly().Location;
                 if (!string.IsNullOrEmpty(asm))
                 {
-                    var beside = Path.Combine(Path.GetDirectoryName(asm) ?? "", file);
+                    var dir = Path.GetDirectoryName(asm) ?? "";
+                    var beside = Path.Combine(dir, file);
                     if (File.Exists(beside))
                     {
                         return beside;
+                    }
+
+                    // Mis-packed flat file next to DLL (legacy / broken zip extract).
+                    var flat = Path.Combine(dir, "hearthwife.json");
+                    if (language == "English" && File.Exists(flat))
+                    {
+                        return flat;
                     }
                 }
             }
@@ -103,7 +165,7 @@ namespace Hearthwife
             {
             }
 
-            // BepInEx plugins root scan (one level).
+            // BepInEx plugins root scan (one level + nested owner-mod folder).
             try
             {
                 var plugins = Path.Combine(Paths.BepInExRootPath, "plugins");
@@ -117,7 +179,6 @@ namespace Hearthwife
                             return candidate;
                         }
 
-                        // Nested owner-mod folder
                         foreach (var sub in Directory.GetDirectories(dir))
                         {
                             candidate = Path.Combine(sub, file);

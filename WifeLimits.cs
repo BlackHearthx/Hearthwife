@@ -34,12 +34,45 @@ namespace Hearthwife
             return n.StartsWith(WifeIdol.PrefabName, System.StringComparison.Ordinal);
         }
 
+        /// <summary>
+        /// True for a real world idol (has a valid non-ghost ZDO).
+        /// Hammer placement ghosts also carry WifeHome and must NOT count toward MaxIdols.
+        /// </summary>
+        internal static bool IsWorldIdol(WifeHome home)
+        {
+            if (home == null)
+            {
+                return false;
+            }
+
+            try
+            {
+                if (home.gameObject == null || !home.isActiveAndEnabled)
+                {
+                    return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            var nview = home.GetComponent<ZNetView>();
+            if (nview == null || !nview.IsValid() || nview.m_ghost)
+            {
+                return false;
+            }
+
+            var zdo = nview.GetZDO();
+            return zdo != null && zdo.IsValid();
+        }
+
         internal static int CountIdols(WifeHome except = null)
         {
             var n = 0;
             foreach (var home in Object.FindObjectsByType<WifeHome>(FindObjectsSortMode.None))
             {
-                if (home == null || home == except)
+                if (home == null || home == except || !IsWorldIdol(home))
                 {
                     continue;
                 }
@@ -50,7 +83,8 @@ namespace Hearthwife
             return n;
         }
 
-        internal static bool CanPlaceAnotherIdol() => CountIdols() < MaxIdols;
+        internal static bool CanPlaceAnotherIdol(WifeHome exceptGhost = null) =>
+            CountIdols(exceptGhost) < MaxIdols;
 
         /// <summary>False for surplus idols left in old worlds after MaxIdols dropped to 1.</summary>
         internal static bool IsAllowedIdol(WifeHome home)
@@ -137,28 +171,24 @@ namespace Hearthwife
 
         private static bool IsAmongAllowedIdols(WifeHome home, int max)
         {
-            var ranked = Object.FindObjectsByType<WifeHome>(FindObjectsSortMode.None);
-            System.Array.Sort(ranked, (a, b) =>
+            if (!IsWorldIdol(home))
             {
-                if (a == null && b == null)
+                return false;
+            }
+
+            var all = Object.FindObjectsByType<WifeHome>(FindObjectsSortMode.None);
+            var ranked = new System.Collections.Generic.List<WifeHome>(all.Length);
+            foreach (var h in all)
+            {
+                if (IsWorldIdol(h))
                 {
-                    return 0;
+                    ranked.Add(h);
                 }
+            }
 
-                if (a == null)
-                {
-                    return 1;
-                }
+            ranked.Sort((a, b) => a.GetInstanceID().CompareTo(b.GetInstanceID()));
 
-                if (b == null)
-                {
-                    return -1;
-                }
-
-                return a.GetInstanceID().CompareTo(b.GetInstanceID());
-            });
-
-            for (var i = 0; i < ranked.Length && i < max; i++)
+            for (var i = 0; i < ranked.Count && i < max; i++)
             {
                 if (ranked[i] == home)
                 {
