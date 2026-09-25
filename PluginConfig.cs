@@ -62,8 +62,8 @@ namespace Hearthwife
                 "Mostra o círculo azul perto do ídolo.");
             BasicsOnly = config.Bind("Wife", "BasicsOnly", true,
                 "Legado de configs antigas. Prefira o modo de vida no menu do ídolo.");
-            DefaultLifestyle = config.Bind("Wife", "LifestyleMode", 0,
-                "Modo padrão de ídolos novos: 0 = Vida no lar, 1 = Misto, 2 = Trabalhadora.");
+            DefaultLifestyle = config.Bind("Wife", "LifestyleMode", 1,
+                "Modo padrão de ídolos novos: 0 = Vida no lar, 1 = Misto (padrão), 2 = Trabalhadora.");
             // Idol = spawn/chest/menu only. She lives in the home radius, not glued to it.
             ParkNearIdol = config.Bind("Wife", "CampAtTotem", false,
                 "Desligado (recomendado): ela vive na área da casa. Ligado = fica na frente do ídolo.");
@@ -142,7 +142,8 @@ namespace Hearthwife
                 return LifestyleMode.Balanced;
             }
 
-            return LifestyleMode.Leisure;
+            // Missing bind / legacy: prefer Balanced so chores work out of the box.
+            return LifestyleMode.Balanced;
         }
 
         internal static LifestyleMode ClampLifestyle(int raw)

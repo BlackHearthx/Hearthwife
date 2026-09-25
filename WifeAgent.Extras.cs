@@ -534,10 +534,31 @@ namespace Hearthwife
             {
                 try
                 {
-                    sm.m_nview.InvokeRPC("EmptyProcessed");
+                    if (!sm.m_nview.HasOwner() || !sm.m_nview.IsOwner())
+                    {
+                        sm.m_nview.ClaimOwnership();
+                    }
                 }
                 catch
                 {
+                }
+
+                try
+                {
+                    // assembly_valheim: Smelter.RPC_EmptyProcessed(long sender)
+                    sm.m_nview.InvokeRPC("RPC_EmptyProcessed");
+                }
+                catch (System.Exception ex)
+                {
+                    Jotunn.Logger.LogWarning("Hearthwife smelt: RPC_EmptyProcessed failed — " + ex.Message);
+                    try
+                    {
+                        sm.m_nview.InvokeRPC("EmptyProcessed");
+                    }
+                    catch (System.Exception ex2)
+                    {
+                        Jotunn.Logger.LogWarning("Hearthwife smelt: EmptyProcessed failed — " + ex2.Message);
+                    }
                 }
 
                 PlayInteractAnimation(sm.transform.position);
@@ -558,10 +579,31 @@ namespace Hearthwife
             {
                 try
                 {
-                    sm.m_nview.InvokeRPC("AddFuel");
+                    if (!sm.m_nview.HasOwner() || !sm.m_nview.IsOwner())
+                    {
+                        sm.m_nview.ClaimOwnership();
+                    }
                 }
                 catch
                 {
+                }
+
+                try
+                {
+                    // assembly_valheim: Smelter.RPC_AddFuel(long sender)
+                    sm.m_nview.InvokeRPC("RPC_AddFuel");
+                }
+                catch (System.Exception ex)
+                {
+                    Jotunn.Logger.LogWarning("Hearthwife smelt: RPC_AddFuel failed — " + ex.Message);
+                    try
+                    {
+                        sm.m_nview.InvokeRPC("AddFuel");
+                    }
+                    catch (System.Exception ex2)
+                    {
+                        Jotunn.Logger.LogWarning("Hearthwife smelt: AddFuel failed — " + ex2.Message);
+                    }
                 }
 
                 PlayInteractAnimation(sm.transform.position);
@@ -586,10 +628,39 @@ namespace Hearthwife
                 inv.RemoveItem(ore, 1);
                 try
                 {
-                    sm.m_nview.InvokeRPC("AddOre", name, false);
+                    if (!sm.m_nview.HasOwner() || !sm.m_nview.IsOwner())
+                    {
+                        sm.m_nview.ClaimOwnership();
+                    }
                 }
                 catch
                 {
+                }
+
+                try
+                {
+                    // assembly_valheim: Smelter.RPC_AddOre(long sender, string name, bool cheated)
+                    sm.m_nview.InvokeRPC("RPC_AddOre", name, false);
+                }
+                catch (System.Exception ex)
+                {
+                    Jotunn.Logger.LogWarning(
+                        $"Hearthwife smelt: RPC_AddOre({name}, false) failed — {ex.Message}");
+                    try
+                    {
+                        sm.m_nview.InvokeRPC("AddOre", name, false);
+                    }
+                    catch (System.Exception ex2)
+                    {
+                        Jotunn.Logger.LogWarning("Hearthwife smelt: AddOre failed — " + ex2.Message);
+                        try
+                        {
+                            inv.AddItem(ore);
+                        }
+                        catch
+                        {
+                        }
+                    }
                 }
 
                 PlayInteractAnimation(sm.transform.position);

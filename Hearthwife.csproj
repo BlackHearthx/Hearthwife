@@ -14,7 +14,7 @@
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <CopyLocalLockFileAssemblies>false</CopyLocalLockFileAssemblies>
     <DebugType>portable</DebugType>
-    <Version>1.0.2</Version>
+    <Version>1.0.3</Version>
     <Authors>blackhearthx</Authors>
     <Description>Homestead wife for Valheim: fire, gather, cook, repair, rest and presence from an idol.</Description>
   </PropertyGroup>
@@ -27,6 +27,12 @@
     <Compile Remove="_ref\**" />
     <None Remove="_ref\**" />
     <EmbeddedResource Remove="_ref\**" />
+    <Compile Remove="dist\**" />
+    <None Remove="dist\**" />
+    <EmbeddedResource Remove="dist\**" />
+    <Compile Remove="tools\**" />
+    <None Remove="tools\**" />
+    <EmbeddedResource Remove="tools\**" />
   </ItemGroup>
 
   <ItemGroup>

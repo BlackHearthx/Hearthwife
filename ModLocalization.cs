@@ -38,6 +38,11 @@ namespace Hearthwife
             var fromDisk = 0;
             var fromEmbed = 0;
 
+            var beside = TryGetBesideDllTranslationsRoot();
+            var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            Jotunn.Logger.LogInfo(
+                $"Hearthwife localization boot v{ver}: Translations beside DLL = {(beside != null ? beside : "(not found)")}");
+
             foreach (var lang in Languages)
             {
                 var source = TryLoadLanguage(loc, lang);
@@ -61,12 +66,33 @@ namespace Hearthwife
             if (loaded == 0)
             {
                 RegisterInlineEnglish(loc);
-                Jotunn.Logger.LogWarning("Hearthwife: Translations missing on disk and in assembly — English inline fallback only");
+                Jotunn.Logger.LogWarning(
+                    "Hearthwife: NO translations from disk or DLL embed — inline English only. " +
+                    "Reinstall 1.0.3+ so plugins/.../Hearthwife/Translations/ exists, or the DLL is the updated build.");
             }
             else
             {
                 Jotunn.Logger.LogInfo(
                     $"Hearthwife: loaded localization for {loaded} language(s) (disk={fromDisk}, embedded={fromEmbed})");
+            }
+        }
+
+        private static string TryGetBesideDllTranslationsRoot()
+        {
+            try
+            {
+                var asm = Assembly.GetExecutingAssembly().Location;
+                if (string.IsNullOrEmpty(asm))
+                {
+                    return null;
+                }
+
+                var root = Path.Combine(Path.GetDirectoryName(asm) ?? "", "Translations");
+                return Directory.Exists(root) ? root : null;
+            }
+            catch
+            {
+                return null;
             }
         }
 

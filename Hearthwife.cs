@@ -13,7 +13,7 @@ namespace Hearthwife
     {
         public const string PluginGUID = "com.blackhearthx.hearthwife";
         public const string PluginName = "Hearthwife";
-        public const string PluginVersion = "1.0.1";
+        public const string PluginVersion = "1.0.3";
 
         internal static HearthwifePlugin Instance { get; private set; }
 

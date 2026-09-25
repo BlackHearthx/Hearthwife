@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.3
+
+- Sync plugin version everywhere (DLL was still reporting 1.0.1)
+- Default lifestyle is Balanced (chores on) for new idols / missing cfg
+- Cooking: `RPC_AddItem(string, bool cheated)` matches Valheim 1.0 (was missing `cheated`)
+- Fermenter / Smelter: claim ownership + correct `RPC_AddItem(int, bool)` / `RPC_AddOre(string, bool)` with failure logs
+
 ## 1.0.2
 
 - Fix idol placement: hammer preview/ghost no longer counts toward MaxIdols (was blocking place with `$hearthwife_idol_limit` on a fresh world)

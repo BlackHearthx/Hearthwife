@@ -33,6 +33,16 @@ if (-not (Test-Path $locSrc)) {
 }
 Copy-Item $locSrc (Join-Path $dist "Translations") -Recurse -Force
 
+# Marker so install folders are obvious in Explorer / zip listings.
+$marker = @(
+  "Hearthwife Translations pack OK",
+  "Language folders expected: 17",
+  "Path after r2modman install:",
+  "  BepInEx/plugins/BlackHearthx-Hearthwife/Translations/<Language>/hearthwife.json"
+) -join "`r`n"
+Set-Content -Path (Join-Path $dist "Translations\README_INSTALL.txt") -Value $marker -Encoding UTF8
+Set-Content -Path (Join-Path $dist "TRANSLATIONS_SHIPPED.txt") -Value $marker -Encoding UTF8
+
 $langDirs = @(Get-ChildItem (Join-Path $dist "Translations") -Directory -ErrorAction SilentlyContinue)
 $langCount = $langDirs.Count
 if ($langCount -lt 17) {

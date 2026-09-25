@@ -1,0 +1,39 @@
+﻿[config]
+schemaVersion = "0.0.1"
+
+[package]
+namespace = "BlackHearthx"
+name = "Hearthwife"
+versionNumber = "1.0.3"
+description = "Homestead wife for your Valheim home: idol, chores, presence, and comfort. Follows your game language."
+websiteUrl = "https://github.com/BlackHearthx/Hearthwife"
+containsNsfwContent = false
+
+[package.dependencies]
+denikson-BepInExPack_Valheim = "5.4.2200"
+ValheimModding-Jotunn = "2.29.2"
+
+[build]
+icon = "./icon.png"
+readme = "./README.md"
+outdir = "./dist/tcli"
+
+[[build.copy]]
+source = "./bin/Release/Hearthwife.dll"
+target = "./"
+
+[[build.copy]]
+source = "./Translations"
+target = "./Translations"
+
+[[build.copy]]
+source = "./CHANGELOG.md"
+target = "./"
+
+[[build.copy]]
+source = "./docs/tutorial"
+target = "./docs/tutorial"
+
+[publish]
+repository = "https://thunderstore.io"
+communities = ["valheim"]

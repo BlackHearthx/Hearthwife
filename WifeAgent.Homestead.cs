@@ -1391,8 +1391,8 @@ namespace Hearthwife
 
         /// <summary>
         /// Place one raw food on the grill. Never lose the item on failure.
-        /// Uses UseItem when possible; otherwise claims ownership + RPC_AddItem(string) — the bool
-        /// overload used before was wrong and made placement always fail for NPCs.
+        /// Uses UseItem when possible; otherwise claims ownership +
+        /// RPC_AddItem(string name, bool cheated) — Valheim 1.0 signature.
         /// </summary>
         private bool TryPlaceFoodOnStation(
             CookingStation station,
@@ -1505,7 +1505,7 @@ namespace Hearthwife
                 return true;
             }
 
-            // Direct path used by vanilla CookItem: remove from inventory + RPC_AddItem(name only).
+            // Direct path: CookItem removes from inventory then RPC_AddItem(name, cheated).
             try
             {
                 if (!station.IsItemAllowed(prefabName))
@@ -1531,7 +1531,8 @@ namespace Hearthwife
                 }
 
                 wifeInv.RemoveItem(held, 1);
-                station.m_nview.InvokeRPC("RPC_AddItem", prefabName);
+                // assembly_valheim: CookingStation.RPC_AddItem(long sender, string name, bool cheated)
+                station.m_nview.InvokeRPC("RPC_AddItem", prefabName, false);
 
                 if (CountFilledCookSlots(station) > slotsBefore || StationHasAnyFood(station))
                 {
@@ -1539,11 +1540,14 @@ namespace Hearthwife
                 }
 
                 // RPC may be owner-side async — if still empty, put food back.
+                Jotunn.Logger.LogWarning(
+                    $"Hearthwife cook: RPC_AddItem({prefabName}, false) did not fill a slot — food returned");
                 ReturnFoodToChest(chest, station, prefabName, fromChest);
                 return false;
             }
-            catch
+            catch (System.Exception ex)
             {
+                Jotunn.Logger.LogWarning("Hearthwife cook: place failed — " + ex.Message);
                 ReturnHeldFood(wifeInv, held, chest, station, fromChest);
                 return false;
             }
@@ -1943,11 +1947,31 @@ namespace Hearthwife
             {
                 try
                 {
-                    fer.m_nview.InvokeRPC("Tap");
+                    if (!fer.m_nview.HasOwner() || !fer.m_nview.IsOwner())
+                    {
+                        fer.m_nview.ClaimOwnership();
+                    }
                 }
                 catch
                 {
+                }
+
+                try
+                {
+                    // assembly_valheim: Fermenter.RPC_Tap(long sender)
                     fer.m_nview.InvokeRPC("RPC_Tap");
+                }
+                catch (System.Exception ex)
+                {
+                    Jotunn.Logger.LogWarning("Hearthwife mead: RPC_Tap failed — " + ex.Message);
+                    try
+                    {
+                        fer.m_nview.InvokeRPC("Tap");
+                    }
+                    catch (System.Exception ex2)
+                    {
+                        Jotunn.Logger.LogWarning("Hearthwife mead: Tap failed — " + ex2.Message);
+                    }
                 }
 
                 PlayInteractAnimation(fer.transform.position);
@@ -1998,20 +2022,66 @@ namespace Hearthwife
                 var baseItem = fer.FindCookableItem(inv);
                 if (baseItem != null)
                 {
-                    var hash = baseItem.m_shared.m_name.GetStableHashCode();
-                    if (baseItem.m_dropPrefab != null)
-                    {
-                        hash = baseItem.m_dropPrefab.name.GetStableHashCode();
-                    }
-
-                    inv.RemoveItem(baseItem, 1);
                     try
                     {
-                        fer.m_nview.InvokeRPC("AddItem", hash, false);
+                        if (!fer.m_nview.HasOwner() || !fer.m_nview.IsOwner())
+                        {
+                            fer.m_nview.ClaimOwnership();
+                        }
                     }
                     catch
                     {
-                        fer.m_nview.InvokeRPC("RPC_AddItem", hash, false);
+                    }
+
+                    // Prefer UseItem(Humanoid, ItemData) — same as player interaction.
+                    var placed = false;
+                    if (_humanoid != null)
+                    {
+                        try
+                        {
+                            placed = fer.UseItem(_humanoid, baseItem);
+                        }
+                        catch
+                        {
+                            placed = false;
+                        }
+                    }
+
+                    if (!placed)
+                    {
+                        // assembly_valheim: Fermenter.RPC_AddItem(long sender, int itemHash, bool cheated)
+                        var hash = baseItem.m_shared.m_name.GetStableHashCode();
+                        if (baseItem.m_dropPrefab != null)
+                        {
+                            hash = baseItem.m_dropPrefab.name.GetStableHashCode();
+                        }
+
+                        inv.RemoveItem(baseItem, 1);
+                        try
+                        {
+                            fer.m_nview.InvokeRPC("RPC_AddItem", hash, false);
+                        }
+                        catch (System.Exception ex)
+                        {
+                            Jotunn.Logger.LogWarning(
+                                $"Hearthwife mead: RPC_AddItem({hash}, false) failed — {ex.Message}");
+                            try
+                            {
+                                fer.m_nview.InvokeRPC("AddItem", hash, false);
+                            }
+                            catch (System.Exception ex2)
+                            {
+                                Jotunn.Logger.LogWarning("Hearthwife mead: AddItem failed — " + ex2.Message);
+                                // Return base so it is not lost.
+                                try
+                                {
+                                    inv.AddItem(baseItem);
+                                }
+                                catch
+                                {
+                                }
+                            }
+                        }
                     }
 
                     PlayInteractAnimation(fer.transform.position);
