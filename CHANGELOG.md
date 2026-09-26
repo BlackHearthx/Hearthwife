@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.0.4
+
+- Fix wrong language in the wife menu/dialogue: only English plus the language the game is actually set to are registered. Jötunn overlays `PlayerPrefs["language"]` on top of English, so registering all 17 packs let a stale language setting replace English text
+- New `General / Language` config: `Auto` (default, follows the game) or a forced language such as `English`
+- Startup log now prints the detected game language and where the translations came from (disk or embedded)
+
 ## 1.0.3
 
 - Sync plugin version everywhere (DLL was still reporting 1.0.1)

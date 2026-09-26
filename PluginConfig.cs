@@ -49,9 +49,15 @@ namespace Hearthwife
         internal static ConfigEntry<bool> UseCustomIdolMesh;
         internal static ConfigEntry<bool> EnableAtmosphere;
         internal static ConfigEntry<bool> EnableDayNight;
+        /// <summary>Read by ModLocalization before any translation is registered.</summary>
+        internal static ConfigEntry<string> Language;
 
         internal static void Bind(ConfigFile config)
         {
+            Language = config.Bind("General", "Language", "Auto",
+                "Auto = segue o idioma do jogo. Para forçar, use o nome exato da pasta em Translations/, " +
+                "por exemplo: English, Portuguese_Brazilian, German, French, Spanish, Russian, Ukrainian.");
+
             HomeRadius = config.Bind("Wife", "HomeRadius", 32f,
                 "Raio do lar em metros. Ela trabalha e passeia dentro desse círculo.");
             MaxIdols = config.Bind("Wife", "MaxIdols", 1,

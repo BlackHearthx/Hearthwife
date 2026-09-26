@@ -2,9 +2,9 @@
 schemaVersion = "0.0.1"
 
 [package]
-namespace = "BlackHearthx"
+namespace = "Blackhearthx"
 name = "Hearthwife"
-versionNumber = "1.0.3"
+versionNumber = "1.0.4"
 description = "Homestead wife for your Valheim home: idol, chores, presence, and comfort. Follows your game language."
 websiteUrl = "https://github.com/BlackHearthx/Hearthwife"
 containsNsfwContent = false

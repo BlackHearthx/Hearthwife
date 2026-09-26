@@ -10,6 +10,8 @@ namespace Hearthwife
 {
     internal static class ModLocalization
     {
+        private const string DefaultLanguage = "English";
+
         private static readonly string[] Languages =
         {
             "English",
@@ -34,33 +36,20 @@ namespace Hearthwife
         internal static void Register()
         {
             var loc = LocalizationManager.Instance.GetLocalization();
-            var loaded = 0;
-            var fromDisk = 0;
-            var fromEmbed = 0;
 
             var beside = TryGetBesideDllTranslationsRoot();
             var ver = Assembly.GetExecutingAssembly().GetName().Version;
+            var gameLanguage = GetGameLanguage();
+            var forced = ResolveForcedLanguage();
+
             Jotunn.Logger.LogInfo(
-                $"Hearthwife localization boot v{ver}: Translations beside DLL = {(beside != null ? beside : "(not found)")}");
+                $"Hearthwife localization boot v{ver}: game language = '{gameLanguage}', " +
+                $"config Language = '{(forced ?? "Auto")}', " +
+                $"Translations beside DLL = {(beside != null ? beside : "(not found)")}");
 
-            foreach (var lang in Languages)
-            {
-                var source = TryLoadLanguage(loc, lang);
-                if (source == LoadSource.None)
-                {
-                    continue;
-                }
-
-                loaded++;
-                if (source == LoadSource.Disk)
-                {
-                    fromDisk++;
-                }
-                else if (source == LoadSource.Embedded)
-                {
-                    fromEmbed++;
-                }
-            }
+            var loaded = forced != null
+                ? RegisterForced(loc, forced)
+                : RegisterAuto(loc, gameLanguage);
 
             // Last-resort fallback if both disk and embedded resources failed.
             if (loaded == 0)
@@ -68,14 +57,136 @@ namespace Hearthwife
                 RegisterInlineEnglish(loc);
                 Jotunn.Logger.LogWarning(
                     "Hearthwife: NO translations from disk or DLL embed — inline English only. " +
-                    "Reinstall 1.0.3+ so plugins/.../Hearthwife/Translations/ exists, or the DLL is the updated build.");
-            }
-            else
-            {
-                Jotunn.Logger.LogInfo(
-                    $"Hearthwife: loaded localization for {loaded} language(s) (disk={fromDisk}, embedded={fromEmbed})");
+                    "Reinstall so plugins/.../Hearthwife/Translations/ exists, or the DLL is the updated build.");
             }
         }
+
+        /// <summary>
+        /// Jötunn applies our English map first, then overlays <see cref="GetGameLanguage"/> on top
+        /// (LocalizationManager.AddTranslations). Registering every language therefore lets a stale
+        /// PlayerPrefs "language" value replace English. Only English + the active language are added.
+        /// </summary>
+        private static int RegisterAuto(Jotunn.Entities.CustomLocalization loc, string gameLanguage)
+        {
+            var loaded = 0;
+            if (AddLanguage(loc, DefaultLanguage, DefaultLanguage))
+            {
+                loaded++;
+            }
+
+            if (!string.Equals(gameLanguage, DefaultLanguage, StringComparison.Ordinal)
+                && IsKnownLanguage(gameLanguage)
+                && AddLanguage(loc, gameLanguage, gameLanguage))
+            {
+                loaded++;
+            }
+
+            return loaded;
+        }
+
+        /// <summary>
+        /// Config override. The chosen pack is registered under English as well, because Jötunn only
+        /// overlays the game language — otherwise forcing a language the game is not set to does nothing.
+        /// </summary>
+        private static int RegisterForced(Jotunn.Entities.CustomLocalization loc, string forced)
+        {
+            var loaded = 0;
+            if (AddLanguage(loc, forced, DefaultLanguage))
+            {
+                loaded++;
+            }
+
+            if (!string.Equals(forced, DefaultLanguage, StringComparison.Ordinal)
+                && AddLanguage(loc, forced, forced))
+            {
+                loaded++;
+            }
+
+            return loaded;
+        }
+
+        /// <summary>Load <paramref name="language"/> JSON and register it under <paramref name="registerAs"/>.</summary>
+        private static bool AddLanguage(
+            Jotunn.Entities.CustomLocalization loc,
+            string language,
+            string registerAs)
+        {
+            try
+            {
+                var json = ReadLanguageJson(language, out var source);
+                if (string.IsNullOrEmpty(json))
+                {
+                    Jotunn.Logger.LogWarning($"Hearthwife: no {language} translation on disk or in the DLL");
+                    return false;
+                }
+
+                loc.AddJsonFile(registerAs, json);
+                var note = string.Equals(language, registerAs, StringComparison.Ordinal)
+                    ? language
+                    : $"{language} as {registerAs}";
+                Jotunn.Logger.LogInfo($"Hearthwife: localization {note} ({source})");
+                return true;
+            }
+            catch (Exception ex)
+            {
+                Jotunn.Logger.LogWarning($"Hearthwife: failed loading {language} loc — {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>Same value Jötunn uses to pick the overlay language.</summary>
+        private static string GetGameLanguage()
+        {
+            try
+            {
+                var lang = PlayerPrefs.GetString("language", DefaultLanguage);
+                return string.IsNullOrEmpty(lang) ? DefaultLanguage : lang;
+            }
+            catch
+            {
+                return DefaultLanguage;
+            }
+        }
+
+        /// <returns>Configured language, or null for Auto / unknown values.</returns>
+        private static string ResolveForcedLanguage()
+        {
+            var value = PluginConfig.Language != null ? PluginConfig.Language.Value : null;
+            value = (value ?? "").Trim();
+
+            if (value.Length == 0 || string.Equals(value, "Auto", StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+
+            foreach (var lang in Languages)
+            {
+                if (string.Equals(lang, value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return lang;
+                }
+            }
+
+            Jotunn.Logger.LogWarning(
+                $"Hearthwife: config Language '{value}' is not shipped — using Auto. " +
+                $"Valid: Auto, {string.Join(", ", Languages)}");
+            return null;
+        }
+
+        private static bool IsKnownLanguage(string language)
+        {
+            foreach (var lang in Languages)
+            {
+                if (string.Equals(lang, language, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        internal static string[] ShippedLanguages => Languages;
 
         private static string TryGetBesideDllTranslationsRoot()
         {
@@ -103,35 +214,29 @@ namespace Hearthwife
             Embedded
         }
 
-        private static LoadSource TryLoadLanguage(Jotunn.Entities.CustomLocalization loc, string language)
+        /// <summary>Disk (user-editable) wins over the copy embedded in the DLL.</summary>
+        private static string ReadLanguageJson(string language, out LoadSource source)
         {
-            try
+            var path = FindTranslationPath(language);
+            if (!string.IsNullOrEmpty(path) && File.Exists(path))
             {
-                var path = FindTranslationPath(language);
-                if (!string.IsNullOrEmpty(path) && File.Exists(path))
+                var json = File.ReadAllText(path);
+                if (!string.IsNullOrEmpty(json))
                 {
-                    var json = File.ReadAllText(path);
-                    if (!string.IsNullOrEmpty(json))
-                    {
-                        loc.AddJsonFile(language, json);
-                        return LoadSource.Disk;
-                    }
+                    source = LoadSource.Disk;
+                    return json;
                 }
-
-                var embedded = ReadEmbeddedJson(language);
-                if (!string.IsNullOrEmpty(embedded))
-                {
-                    loc.AddJsonFile(language, embedded);
-                    return LoadSource.Embedded;
-                }
-
-                return LoadSource.None;
             }
-            catch (Exception ex)
+
+            var embedded = ReadEmbeddedJson(language);
+            if (!string.IsNullOrEmpty(embedded))
             {
-                Jotunn.Logger.LogWarning($"Hearthwife: failed loading {language} loc — {ex.Message}");
-                return LoadSource.None;
+                source = LoadSource.Embedded;
+                return embedded;
             }
+
+            source = LoadSource.None;
+            return null;
         }
 
         private static string ReadEmbeddedJson(string language)
